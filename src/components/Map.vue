@@ -1,5 +1,6 @@
 <template>
   <div class="map">
+    <b-form-input v-model="text" placeholder="Enter your name"></b-form-input>
     <l-map ref="map">
       <l-tile-layer :url="url" :noWrap="true" />
     </l-map>
@@ -28,7 +29,8 @@ export default {
   },
   data() {
     return {
-      url: "http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+      url: "http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      text: ""
     };
   },
   async mounted() {
