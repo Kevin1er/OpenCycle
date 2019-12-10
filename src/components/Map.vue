@@ -74,6 +74,9 @@ import * as moment from "moment";
 import Wikibase from "../services/wikidata";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import "leaflet.markercluster/dist/MarkerCluster.css";
+import "leaflet.markercluster/dist/MarkerCluster.Default.css";
+import { MarkerClusterGroup } from "leaflet.markercluster";
 
 export default {
   name: "Map",
@@ -94,7 +97,7 @@ export default {
         iconSize: [50, 50],
         iconAnchor: [25, 50]
       }),
-      markers: [],
+      markers: null,
       isOverlayOn: false,
       selectedStation: null
     };
@@ -106,13 +109,25 @@ export default {
   },
   methods: {
     addMarkers: function(list) {
+      this.markers = new MarkerClusterGroup();
       list.forEach(station => {
         let marker = L.marker([station.lat, station.lng], {
           icon: this.icon,
           object: station
         });
-        this.markers.push(marker);
+        marker.on("click", event => {
+          this.selectedStation = event.target.options.object;
+          if (this.selectedMarker) {
+            this.selectedMarker.setIcon(this.icon);
+          }
+          this.selectedMarker = event.target;
+          this.isOverlayOn = true;
+          this.map.setView(event.latlng);
+          event.target.setIcon(this.selectedIcon);
+        });
+        this.markers.addLayer(marker);
       });
+      this.map.addLayer(this.markers);
     },
     toDate: function(_timestamp) {
       return moment(_timestamp * 1000).format("DD-MM-YYYY, HH:mm:ss");
@@ -139,27 +154,6 @@ export default {
       maxZoom: 18
     }).addTo(this.map);
 
-    this.map.on("zoom", value => {
-      if (value.target._zoom > 15) {
-        this.markers.forEach(marker => {
-          marker.on("click", event => {
-            this.selectedStation = event.target.options.object;
-            if (this.selectedMarker) {
-              this.selectedMarker.setIcon(this.icon);
-            }
-            this.selectedMarker = event.target;
-            this.isOverlayOn = true;
-            this.map.setView(event.latlng);
-            event.target.setIcon(this.selectedIcon);
-          });
-          marker.addTo(this.map);
-        });
-      } else if (value.target._zoom <= 15) {
-        this.markers.forEach(marker => {
-          marker.remove();
-        });
-      }
-    });
     this.addMarkers(this.stations);
   }
 };
