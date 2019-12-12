@@ -6,10 +6,7 @@
           >M</b-button
         >
       </b-input-group-prepend>
-      <b-form-input
-        v-model="text"
-        placeholder="Search on OpenCycles ..."
-      ></b-form-input>
+      <b-form-input v-model="text" placeholder="Search on OpenCycles ..." />
     </b-input-group>
     <div v-if="isOverlayOn" class="overlay">
       <b-card
@@ -85,6 +82,9 @@ export default {
   },
   data() {
     return {
+      map: null,
+      resMarkers: [],
+      resMarker: null,
       url: "http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
       text: "",
       icon: L.icon({
@@ -92,12 +92,17 @@ export default {
         iconSize: [50, 50],
         iconAnchor: [25, 50]
       }),
+      iconR: L.icon({
+        iconUrl: "images/rest.png",
+        iconSize: [30, 50],
+        iconAnchor: [25, 50]
+      }),
       selectedIcon: L.icon({
         iconUrl: "images/iconselected50.png",
         iconSize: [50, 50],
         iconAnchor: [25, 50]
       }),
-      markers: null,
+      markers: new MarkerClusterGroup(),
       isOverlayOn: false,
       selectedStation: null
     };
@@ -109,7 +114,6 @@ export default {
   },
   methods: {
     addMarkers: function(list) {
-      this.markers = new MarkerClusterGroup();
       list.forEach(station => {
         let marker = L.marker([station.lat, station.lng], {
           icon: this.icon,
@@ -123,11 +127,62 @@ export default {
           this.selectedMarker = event.target;
           this.isOverlayOn = true;
           this.map.setView(event.latlng);
+          this.addRestaurants([
+            this.selectedStation.lng,
+            this.selectedStation.lat
+          ]);
           event.target.setIcon(this.selectedIcon);
         });
         this.markers.addLayer(marker);
       });
       this.map.addLayer(this.markers);
+    },
+    addRestaurants: function(point) {
+      if (Array.isArray(this.resMarkers) && this.resMarkers.length > 0) {
+        this.resMarkers.forEach(marker => {
+          this.map.removeLayer(marker);
+        });
+        this.resMarkers = [];
+      } else {
+        this.wikibase = new Wikibase("https://query.wikidata.org/sparql");
+        var query =
+          `SELECT ?place ?placeLabel ?image ?coordinate_location ?dist ?instance_of ?instance_ofLabel WHERE {
+  SERVICE wikibase:around {
+    ?place wdt:P625 ?coordinate_location.
+    bd:serviceParam wikibase:center "Point(` +
+          point[0] +
+          " " +
+          point[1] +
+          `)"^^geo:wktLiteral .
+    bd:serviceParam wikibase:radius "1".
+    bd:serviceParam wikibase:distance ?dist.
+  }
+  ?place wdt:P31 wd:Q11707.
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "[AUTO_LANGUAGE],en". }
+  OPTIONAL { ?place wdt:P18 ?image. }
+  OPTIONAL { ?place wdt:P31 ?instance_of. }
+}`;
+        var result = this.wikibase.query(query);
+        result.then(data => {
+          var resData = data.results.bindings;
+          resData.forEach(restaurant => {
+            var value = restaurant.coordinate_location.value;
+            var coordinates = value
+              .match("(\\d)+\\.(\\d+) (\\d)+\\.(\\d+)")[0]
+              .split(" ");
+            this.resMarker = null;
+            this.resMarker = L.marker(
+              [parseFloat(coordinates[1]), parseFloat(coordinates[0])],
+              {
+                icon: this.iconR
+              }
+            );
+            this.resMarkers.push(this.resMarker);
+            this.markers.addLayer(this.resMarker);
+          });
+          this.map.addLayer(this.markers);
+        });
+      }
     },
     toDate: function(_timestamp) {
       return moment(_timestamp * 1000).format("DD-MM-YYYY, HH:mm:ss");
@@ -139,12 +194,6 @@ export default {
     }
   },
   async mounted() {
-    this.wikibase = new Wikibase("https://query.wikidata.org/sparql");
-    this.wikibase.query(`
-    SELECT ?a ?b ?c WHERE {
-      ?a ?b ?c .
-    }
-    LIMIT 10`);
     this.$store.dispatch("stardog/PULL_STATIONS", this.$stardog);
     this.map = L.map("map", { zoomControl: false }).setView(
       [46.6305787, 2.4554443],
