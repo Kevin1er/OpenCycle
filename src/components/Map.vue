@@ -30,6 +30,7 @@
           >last update :
           {{ this.toDate(selectedStation.last_update) }}</b-card-text
         >
+        <script v-html="jsonld" type="application/ld+json" />
       </b-card>
     </div>
     <div id="map"></div>
@@ -74,6 +75,7 @@ import "leaflet/dist/leaflet.css";
 import "leaflet.markercluster/dist/MarkerCluster.css";
 import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import { MarkerClusterGroup } from "leaflet.markercluster";
+import { getJsonLD } from "../services/JsonLD";
 
 export default {
   name: "Map",
@@ -83,6 +85,7 @@ export default {
   data() {
     return {
       map: null,
+      jsonld: "nothing here",
       resMarkers: [],
       resMarker: null,
       url: "http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
@@ -113,6 +116,7 @@ export default {
     }
   },
   methods: {
+    getJsonLD,
     addMarkers: function(list) {
       list.forEach(station => {
         let marker = L.marker([station.lat, station.lng], {
@@ -132,8 +136,10 @@ export default {
             this.selectedStation.lat
           ]);
           event.target.setIcon(this.selectedIcon);
+          this.jsonld = this.getJsonLD(this.selectedStation);
         });
         this.markers.addLayer(marker);
+        console.log(station.available_bikes);
       });
       this.map.addLayer(this.markers);
     },

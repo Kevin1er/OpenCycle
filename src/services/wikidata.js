@@ -5,10 +5,12 @@ class Wikibase {
     this.endpoint = _endpoint;
   }
   async query(_query) {
-    const answer = await fetch(
+    var answer = await fetch(
       `${this.endpoint}?query=${_query}&format=json&origin=*`
-    );
-    return await answer.json();
+    ).then(data => {
+      return data.json();
+    });
+    return await answer;
   }
 }
 
